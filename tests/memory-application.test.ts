@@ -411,6 +411,39 @@ test(
       assert.ok(!learned[0].body.includes('Memory Fixture'));
       assert.ok(!learned[0].body.includes(skillSecret));
       assert.ok(skillDrafts.length && skillDrafts.every((draft) => !draft.includes(skillSecret)));
+      const exportPath = '/api/memory/skills/synthetic-portal-statement/export';
+      const exported = await application.app.inject({
+        method: 'GET',
+        url: exportPath,
+        headers,
+      });
+      assert.equal(exported.statusCode, 200, exported.body);
+      assert.deepEqual(Object.keys(exported.json()).sort(), [
+        'body',
+        'description',
+        'name',
+        'updated',
+      ]);
+      assert.equal(exported.json().name, 'synthetic-portal-statement');
+      assert.doesNotMatch(exported.body, /Memory Fixture|x-api-key|notes|archive/);
+      const deniedExport = await application.app.inject({
+        method: 'GET',
+        url: exportPath,
+        headers: { host: headers.host, origin: headers.origin },
+      });
+      assert.equal(deniedExport.statusCode, 401);
+      const absentExport = await application.app.inject({
+        method: 'GET',
+        url: '/api/memory/skills/does-not-exist/export',
+        headers,
+      });
+      assert.equal(absentExport.statusCode, 404);
+      const invalidExport = await application.app.inject({
+        method: 'GET',
+        url: '/api/memory/skills/INVALID/export',
+        headers,
+      });
+      assert.equal(invalidExport.statusCode, 400);
       const edited = await application.app.inject({
         method: 'PATCH',
         url: '/api/memory/skills/synthetic-portal-statement',
