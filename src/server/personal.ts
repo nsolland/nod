@@ -379,6 +379,22 @@ export function createPersonalService(dependencies: PersonalDependencies) {
       changed(memory?.forgetArchived(request.body), 'forget'),
     );
     const skillName = (params: unknown) => (params as { name: string }).name;
+    // Explicit one-skill export for authorized local integrations such as Hermes.
+    // The normal Nod API access hook protects this route; never export notes,
+    // archive, credentials, task prompts or other owner's memory.
+    app.get('/api/memory/skills/:name/export', async (request, reply) => {
+      const name = skillName(request.params);
+      if (!/^[a-z][a-z0-9-]{2,63}$/.test(name))
+        return reply.code(400).send({ error: 'Invalid learned skill name.' });
+      const skill = (await memoryView()).skills.find((item) => item.name === name);
+      if (!skill) return reply.code(404).send({ error: 'Learned skill not found.' });
+      return reply.header('Cache-Control', 'private, no-store').send({
+        name: skill.name,
+        description: skill.description,
+        body: skill.body,
+        updated: skill.updated,
+      });
+    });
     app.patch('/api/memory/skills/:name', (request) =>
       changed(learnedSkills?.change(skillName(request.params), request.body)),
     );
